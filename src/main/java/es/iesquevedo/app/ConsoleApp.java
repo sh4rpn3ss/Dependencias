@@ -1,7 +1,7 @@
 package es.iesquevedo.app;
 
-import es.iesquevedo.dao.JsonPeliculaDao;
-import es.iesquevedo.dao.JsonSocioDao;
+import es.iesquevedo.dao.PeliculaDao;
+import es.iesquevedo.dao.SocioDao;
 import es.iesquevedo.modelo.Alquiler;
 import es.iesquevedo.modelo.Pelicula;
 import es.iesquevedo.modelo.Socio;
@@ -13,22 +13,26 @@ import java.util.Optional;
 import java.util.Scanner;
 
 public class ConsoleApp {
-    private final JsonPeliculaDao peliculaDao;
-    private final JsonSocioDao socioDao;
+
+    private final PeliculaDao peliculaDao;
+    private final SocioDao socioDao;
     private final AlquilerService service;
 
-    // los DAOs/servicio se crean internamente
-    public ConsoleApp() {
-        String base = System.getProperty("user.dir");
-        this.peliculaDao = new JsonPeliculaDao(base + "/peliculas.json");
-        this.socioDao = new JsonSocioDao(base + "/socios.json");
-        this.service = new AlquilerService();
+    public ConsoleApp(
+            PeliculaDao peliculaDao,
+            SocioDao socioDao,
+            AlquilerService service
+    ) {
+        this.peliculaDao = peliculaDao;
+        this.socioDao = socioDao;
+        this.service = service;
     }
 
     public void crearPelicula(Scanner scanner) {
         System.out.print("Título: ");
         String titulo = scanner.nextLine().trim();
         if (titulo.isEmpty()) { System.out.println("Título vacío"); return; }
+
         System.out.print("Año: ");
         int anio;
         try {
@@ -36,6 +40,7 @@ public class ConsoleApp {
         } catch (NumberFormatException e) {
             System.out.println("Año no válido"); return;
         }
+
         System.out.print("Precio (ej. 2.5): ");
         BigDecimal precio;
         try {
@@ -43,6 +48,7 @@ public class ConsoleApp {
         } catch (Exception e) {
             System.out.println("Precio no válido"); return;
         }
+
         Pelicula p = new Pelicula(titulo, anio, precio);
         peliculaDao.save(p);
         System.out.println("Película guardada: " + p);
@@ -58,9 +64,11 @@ public class ConsoleApp {
         System.out.print("DNI: ");
         String dni = scanner.nextLine().trim();
         if (dni.isEmpty()) { System.out.println("DNI vacío"); return; }
+
         System.out.print("Nombre: ");
         String nombre = scanner.nextLine().trim();
         if (nombre.isEmpty()) { System.out.println("Nombre vacío"); return; }
+
         Socio s = new Socio(dni, nombre);
         socioDao.save(s);
         System.out.println("Socio guardado: " + s);
@@ -77,13 +85,19 @@ public class ConsoleApp {
         String dni = scanner.nextLine().trim();
         System.out.print("Título película: ");
         String titulo = scanner.nextLine().trim();
+
         try {
             Optional<Pelicula> optEj = peliculaDao.findAvailableByTitulo(titulo);
-            if (optEj.isEmpty()) { System.out.println("Película no encontrada o ningún ejemplar disponible"); return; }
+            if (optEj.isEmpty()) {
+                System.out.println("Película no encontrada o no disponible");
+                return;
+            }
+
             Socio s = new Socio(dni, "");
             Pelicula p = optEj.get();
             Alquiler alquiler = service.alquilar(s, p);
             System.out.println("Alquilado: " + alquiler);
+
         } catch (RuntimeException e) {
             System.out.println("No se pudo alquilar: " + e.getMessage());
         }
@@ -110,10 +124,8 @@ public class ConsoleApp {
             Long id = Long.parseLong(s);
             service.devolver(id);
             System.out.println("Devolución realizada");
-        } catch (NumberFormatException e) {
-            System.out.println("ID no válido");
-        } catch (RuntimeException e) {
-            System.out.println("No se pudo devolver: " + e.getMessage());
+        } catch (Exception e) {
+            System.out.println("Error: " + e.getMessage());
         }
     }
 }

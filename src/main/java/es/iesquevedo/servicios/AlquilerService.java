@@ -1,8 +1,8 @@
 package es.iesquevedo.servicios;
 
-import es.iesquevedo.dao.JsonAlquilerDao;
-import es.iesquevedo.dao.JsonPeliculaDao;
-import es.iesquevedo.dao.JsonSocioDao;
+import es.iesquevedo.dao.AlquilerDao;
+import es.iesquevedo.dao.PeliculaDao;
+import es.iesquevedo.dao.SocioDao;
 import es.iesquevedo.modelo.Alquiler;
 import es.iesquevedo.modelo.Pelicula;
 import es.iesquevedo.modelo.Socio;
@@ -12,61 +12,50 @@ import java.util.List;
 import java.util.stream.Collectors;
 
 public class AlquilerService {
-    private final JsonAlquilerDao alquilerDao;
-    private final JsonPeliculaDao peliculaDao;
-    private final JsonSocioDao socioDao;
+    private final AlquilerDao alquilerDao;
+    private final PeliculaDao peliculaDao;
+    private final SocioDao socioDao;
     private final int limitePorSocio;
 
-    public AlquilerService() {
-        // Acoplamiento directo: se crean las implementaciones concretas aquí.
-        String base = System.getProperty("user.dir");
-        this.peliculaDao = new JsonPeliculaDao(base + "/peliculas.json");
-        this.socioDao = new JsonSocioDao(base + "/socios.json");
-        this.alquilerDao = new JsonAlquilerDao(base + "/alquileres.json");
-        this.limitePorSocio = 3;
-    }
-
-    // Constructor alternativo para pruebas que permite pasar rutas de fichero
-    public AlquilerService(String basePath) {
-        this.peliculaDao = new JsonPeliculaDao(basePath + "/peliculas.json");
-        this.socioDao = new JsonSocioDao(basePath + "/socios.json");
-        this.alquilerDao = new JsonAlquilerDao(basePath + "/alquileres.json");
-        this.limitePorSocio = 3;
+    public AlquilerService(
+            AlquilerDao alquilerDao,
+            PeliculaDao peliculaDao,
+            SocioDao socioDao,
+            int limitePorSocio
+    ) {
+        this.alquilerDao = alquilerDao;
+        this.peliculaDao = peliculaDao;
+        this.socioDao = socioDao;
+        this.limitePorSocio = limitePorSocio;
     }
 
     public Alquiler alquilar(Socio socio, Pelicula pelicula) {
         if (socio == null) throw new RuntimeException("Socio nulo");
         if (pelicula == null) throw new RuntimeException("Pelicula nula");
 
-        // asegurar que socio existe
         if (socioDao.findByDni(socio.getDni()).isEmpty()) {
             socioDao.save(socio);
         }
 
-        // comprobar limite de socio
         List<Alquiler> porSocio = alquilerDao.findBySocio(socio.getDni()).stream().filter(a -> !a.isDevuelto()).collect(Collectors.toList());
         if (porSocio.size() >= limitePorSocio) {
             throw new RuntimeException("El socio ha alcanzado el límite de alquileres activos: " + limitePorSocio);
         }
 
-        // buscar un ejemplar disponible de la pelicula
         var optEjemplar = peliculaDao.findAvailableByTitulo(pelicula.getTitulo());
         if (optEjemplar.isEmpty()) {
             throw new RuntimeException("No hay ejemplares disponibles para: " + pelicula.getTitulo());
         }
         Pelicula ejemplar = optEjemplar.get();
 
-        // comprobar que el socio no tiene ya ese ejemplar activo
         boolean yaTieneMismoEjemplar = porSocio.stream().anyMatch(a -> a.getPelicula() != null && a.getPelicula().getId() != null && a.getPelicula().getId().equals(ejemplar.getId()));
         if (yaTieneMismoEjemplar) {
             throw new RuntimeException("El socio ya tiene alquilado ese ejemplar (id=" + ejemplar.getId() + ")");
         }
 
-        // marcar no disponible
         ejemplar.setDisponible(false);
         peliculaDao.save(ejemplar);
 
-        // crear alquiler apuntando al ejemplar
         Alquiler alquiler = new Alquiler(socio, ejemplar, LocalDate.now());
         return alquilerDao.save(alquiler);
     }
@@ -79,7 +68,6 @@ public class AlquilerService {
         a.setFechaDevolucion(LocalDate.now());
         alquilerDao.save(a);
 
-        // marcar ejemplar disponible otra vez
         Pelicula ejemplar = a.getPelicula();
         if (ejemplar != null && ejemplar.getId() != null) {
             ejemplar.setDisponible(true);
@@ -95,3 +83,4 @@ public class AlquilerService {
         return alquilerDao.findBySocio(dni);
     }
 }
+

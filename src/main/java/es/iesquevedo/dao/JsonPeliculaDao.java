@@ -18,8 +18,9 @@ import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.stream.Collectors;
+import es.iesquevedo.dao.PeliculaDao;
 
-public class JsonPeliculaDao {
+public class JsonPeliculaDao implements PeliculaDao {
     private final File file;
     private final Gson gson;
     private List<Pelicula> store = new ArrayList<>();
